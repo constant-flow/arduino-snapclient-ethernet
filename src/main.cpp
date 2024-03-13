@@ -26,13 +26,19 @@ void setup() {
     delay(1000);
   }
 
-  // initialize output
   auto cfg = out.defaultConfig();
+  // initialize output
+  #ifdef BOARD_WT32
+  cfg.pin_bck = 14;
+  cfg.pin_ws = 12;
+  cfg.pin_data = 15;
+  //cfg.buffer_size = 512;
+  //cfg.buffer_count = 6;
+  #else
   cfg.pin_bck = 14;
   cfg.pin_ws = 15;
   cfg.pin_data = 22;
-  //cfg.buffer_size = 512;
-  //cfg.buffer_count = 6;
+  #endif
   out.begin(cfg);
 
   // print ip address
