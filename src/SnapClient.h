@@ -11,6 +11,10 @@
 //#include <WiFi.h>
 #include "Client.h"
 
+#ifdef CONFIG_ETHERNET
+#include <ETH.h>
+#endif
+
 
 #if CONFIG_NVS_FLASH
 #include "nvs_flash.h"
@@ -94,6 +98,7 @@ public:
   /// Starts the processing
   bool begin() {
 #if defined(ESP32)
+  #ifndef CONFIG_ETHERNET
     if (WiFi.status() != WL_CONNECTED) {
       ESP_LOGE(TAG, "WiFi not connected");
       return false;
@@ -101,6 +106,12 @@ public:
     // use maximum speed
     WiFi.setSleep(false);
     ESP_LOGI(TAG, "Connected to AP");
+  #else
+    if (!ETH.linkUp()) {
+      ESP_LOGE(TAG, "ETH not connected");
+      return false;
+    }
+  #endif    
 #endif
 
     // Get MAC address for WiFi station
@@ -209,7 +220,11 @@ protected:
 
   void setupMACAddress() {
 #ifdef ESP32
+  #ifndef CONFIG_ETHERNET
     const char *adr = strdup(WiFi.macAddress().c_str());
+  #else 
+    const char *adr = strdup(ETH.macAddress().c_str());
+  #endif
     p_snapprocessor->setMacAddress(adr);
     ESP_LOGI(TAG, "mac: %s", adr);
     checkHeap();
