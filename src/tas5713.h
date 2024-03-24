@@ -17,6 +17,10 @@
 #ifndef _TAS5713_H
 #define _TAS5713_H
 
+#include <Arduino.h>
+#include <Wire.h>
+
+#define DAC_ADDRESS 0x1B
 
 // TAS5713 I2C-bus register addresses
 
@@ -210,6 +214,115 @@ static const struct tas5713_init_command tas5713_init_sequence[] = {
     //size zero marks end
     { .size = 0,  .data = "\x00" },
 };
+
+void dacSet(uint8_t address, uint8_t value) {
+  Wire.beginTransmission(DAC_ADDRESS);
+  Wire.write(address);
+  Wire.write(value);
+  Wire.endTransmission(); 
+}
+
+void dacSetChunk( int size, const char * data) {
+  Wire.beginTransmission(DAC_ADDRESS);
+  for(int i = 0; i<size; i++)
+  Wire.write(data[i]);
+  Wire.endTransmission(); 
+}
+
+uint8_t dacRead(uint8_t address) {
+  Wire.requestFrom(DAC_ADDRESS, 1);    
+    // Slave may send less than requested
+    while(Wire.available()) {
+        uint8_t c = Wire.read();    // Receive a byte as character
+        Serial.print(c);         // Print the character
+        return c;
+    }
+    return 0;
+}
+
+void scanI2CDevices() {
+   byte error, address;
+  int nDevices = 0;
+  for(address = 1; address < 127; address++ ) {
+    Wire.beginTransmission(address);
+    error = Wire.endTransmission();
+    if (error == 0) {
+      Serial.print("I2C device found at address 0x");
+      if (address<16) {
+        Serial.print("0");
+      }
+      Serial.println(address,HEX);
+      nDevices++;
+    }
+    else if (error==4) {
+      Serial.print("Unknow error at address 0x");
+      if (address<16) {
+        Serial.print("0");
+      }
+      Serial.println(address,HEX);
+    }    
+  }
+  if (nDevices == 0) {
+    Serial.println("No I2C devices found\n");
+  }
+  else {
+    Serial.println("done\n");
+  }
+}
+
+void dacClearError(){
+  dacSet(TAS5713_ERROR_STATUS, 0x00);
+}
+
+
+
+// init sequence used from https://github.com/sle118/squeezelite-esp32/blob/master-v4.3/components/squeezelite/tas57xx/dac_5713.c
+void setupDAC() {
+  // pinMode(2, INPUT_PULLUP);  
+  Wire.begin(2,4,100000);
+  Wire.setClock(100000);
+  // scanI2CDevices();
+
+  uint8_t ret = dacRead(0x00);
+  if(ret == 255) {
+    Serial.println("DAC not found");
+  } else {
+    Serial.print("DAC found: ");
+    Serial.println(ret);
+  }
+
+  dacClearError();
+  dacSet(TAS5713_OSC_TRIM, 0x00); /* a delay is required after this */
+  delay(1000);
+  dacClearError();
+  dacSet(TAS5713_CLOCK_CTRL, 0x60);
+  dacSet(TAS5713_SERIAL_DATA_INTERFACE, 0x05); /* I2S  LJ 16 bit */
+  // dacSet(TAS5713_SERIAL_DATA_INTERFACE, 0x05); /* I2S  LJ 24 bit */
+  Serial.println("Read error"); dacRead(0x02);
+  dacSet(TAS5713_SYSTEM_CTRL2, 0x00); /* exit all channel shutdown */
+  dacSet(TAS5713_SOFT_MUTE, 0x00);    /* unmute */
+  dacSet(TAS5713_VOL_MASTER, 0x20);
+  dacSet(TAS5713_OSC_TRIM, 0x00);
+  // dacSet(TAS5713_VOL_CH1, 0x30);
+  // dacSet(TAS5713_VOL_CH2, 0x30);
+  // dacSet(TAS5713_VOL_HEADPHONE, 0x80);
+  Serial.println("Read error"); dacRead(0x02);
+
+  // Now start programming the default initialization sequence
+  // int i = 0;
+	// while (++i) {
+  //   if(tas5713_init_sequence[i].size == 0) break;
+  //   dacSetChunk(tas5713_init_sequence[i].size, tas5713_init_sequence[i].data);
+	// }
+	
+	// Unmute
+	// dacSet(TAS5713_SYSTEM_CTRL2, 0x00);
+  
+  dacSet(TAS5713_SYSTEM_CTRL2, 0x00);
+  dacSet(TAS5713_SERIAL_DATA_INTERFACE, 0x03);
+  dacSet(TAS5713_SOFT_MUTE, 0x00);  
+  dacSet(TAS5713_VOL_MASTER, 0x50);
+}
 
 
 #endif  /* _TAS5713_H */
